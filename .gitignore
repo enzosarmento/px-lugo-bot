@@ -1,5 +1,7 @@
 .idea/
 .vscode/
-venv
+.venv/
 .studio/
 __pycache__/
+.lugo/
+.devcontainer/

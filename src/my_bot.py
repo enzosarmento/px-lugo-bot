@@ -9,40 +9,19 @@ from settings import get_my_expected_position
 class MyBot(lugo4py.Bot, ABC):
     def on_disputing(self, inspector: lugo4py.GameSnapshotInspector) -> List[lugo4py.Order]:
         try:
-
-            # You have three sources of data about the game
-            #
-            # 1. inspector - provides real time data about the game elements.
-            # You bot receives an inspector every turn. You may read all data about the elements of the game, time,
-            # score, and everything else that changes during the game
-            # The inspector also helps you to create orders:
-            # inspector.get_my_team_players() # returns an array
-            # inspector.get_me() # return the bot itself
-            # inspector.get_ball().position
-            # inspector.make_order_move_by_direction(lugo4py.DIRECTION.FORWARD)
-            # inspector.make_order_move_from_point(ball_position)
-            #
-            # 2. self.mapper - Provides data about field coordinates, such as the location of the goals.
-            # The Mapper views the field as a set of "regions" relative to your team’s side, rather than using fixed
-            # coordinates. This means you don’t need to worry about which side you’re playing on—these coordinates
-            # will always make sense from your team’s perspective.
-            # Example: self.mapper.get_region_from_point(me.position).get_center()
-            #
-            # 3. specs - brings all the game specification.
-            # Example:
-            # lugo4py.specs.MAX_Y_COORDINATE
-            # lugo4py.specs.BALL_MAX_SPEED
-
+            me = inspector.get_me()
             ball_position = inspector.get_ball().position
+            my_team = inspector.get_my_team_players()
 
-            # try the auto complete for reader.make_order_... there are other options
-            move_order = inspector.make_order_move_max_speed(ball_position)
+            closest_players = self.get_closest_players(ball_position, my_team)
+            n_catchers = 3
+            catchers = closest_players[:n_catchers]
+            if me in catchers:
+                move_order = inspector.make_order_move_max_speed(ball_position)
+            else:
+                move_order = inspector.make_order_move_max_speed(get_my_expected_position(inspector, self.mapper, self.number))
 
-            # Try other methods to create Move Orders:
-            # move_order = reader.make_order_move_by_direction(lugo4py.DIRECTION_FORWARD)
-            # move_order = reader.make_order_move_from_vector(lugo4py.sub_vector(vector_a, vector_b))
-
-            # we can ALWAYS try to catch the ball
+            
             catch_order = inspector.make_order_catch()
 
             return [move_order, catch_order]
@@ -54,10 +33,17 @@ class MyBot(lugo4py.Bot, ABC):
     def on_defending(self, inspector: lugo4py.GameSnapshotInspector) -> List[lugo4py.Order]:
         try:
 
+            me = inspector.get_me()
             ball_position = inspector.get_ball().position
+            my_team = inspector.get_my_team_players()
 
-            move_order = inspector.make_order_move_max_speed(ball_position)
-            # we can ALWAYS try to catch the ball
+            closest_players = self.get_closest_players(ball_position, my_team)
+            n_catchers = 3
+            catchers = closest_players[:n_catchers]
+            if me in catchers:
+                move_order = inspector.make_order_move_max_speed(ball_position)
+            else:
+                move_order = inspector.make_order_move_max_speed(get_my_expected_position(inspector, self.mapper, self.number))
             catch_order = inspector.make_order_catch()
 
             return [move_order, catch_order]
@@ -67,19 +53,29 @@ class MyBot(lugo4py.Bot, ABC):
 
     def on_holding(self, inspector: lugo4py.GameSnapshotInspector) -> List[lugo4py.Order]:
         try:
+            opponent_goal = self.mapper.get_attack_goal()
+            me = inspector.get_me()
+            my_team = inspector.get_my_team_players()
 
-            # "point" is an X and Y raw coordinate referenced by the field, so the side of the field matters!
-            # "region" is a mapped area of the field create by your mapper! so the side of the field DO NOT matter!
-            opponent_goal_point = self.mapper.get_attack_goal()
-            goal_region = self.mapper.get_region_from_point(opponent_goal_point.get_center())
-            my_region = self.mapper.get_region_from_point(inspector.get_me().position)
+            inspector.get_opponent_goalkeeper().position
+            dist_to_goal = lugo4py.distance_between_points(me.position, opponent_goal.get_center())
 
-            if self.is_near(my_region, goal_region):
-                my_order = inspector.make_order_kick_max_speed(opponent_goal_point.get_center())
+            if dist_to_goal <= lugo4py.GOAL_ZONE_RANGE + lugo4py.BALL_SIZE * 4:
+                my_order = inspector.make_order_kick_max_speed(self.find_best_shot_target(inspector))
+                return [my_order]
             else:
-                my_order = inspector.make_order_move_max_speed(opponent_goal_point.get_center())
+                my_order = inspector.make_order_move_max_speed(opponent_goal.get_center())
+                free_players = self.get_free_allies(inspector, 600)
+                closest_to_goal = self.get_closest_players(opponent_goal.get_center(), my_team)
+                for ally in closest_to_goal:
+                    if ally in free_players:
+                        position = lugo4py.Point(ally.position.x - 500, ally.position.y - 500)
+                        kick_order = inspector.make_order_kick_max_speed(position)
+                        return [my_order, kick_order]
+                
+                return [my_order]
 
-            return [my_order]
+            
 
         except Exception as e:
             print(f'did not play this turn due to exception. {e}')
@@ -87,18 +83,15 @@ class MyBot(lugo4py.Bot, ABC):
 
     def on_supporting(self, inspector: lugo4py.GameSnapshotInspector) -> List[lugo4py.Order]:
         try:
-            ball_holder_position = inspector.get_ball().position
-
-            # "point" is an X and Y raw coordinate referenced by the field, so the side of the field matters!
-            # "region" is a mapped area of the field create by your mapper! so the side of the field DO NOT matter!
-            ball_holder_region = self.mapper.get_region_from_point(ball_holder_position)
-            my_region = self.mapper.get_region_from_point(inspector.get_me().position)
-
-            if self.is_near(ball_holder_region, my_region):
-                move_dest = ball_holder_position
-            else:
-                move_dest = get_my_expected_position(inspector, self.mapper, self.number)
-
+            move_dest = get_my_expected_position(inspector, self.mapper, self.number)
+            me = inspector.get_me()
+            my_team = inspector.get_my_team_players()
+            player_ball_holder = inspector.get_ball_holder()
+            free_players = self.get_closest_players(player_ball_holder.position, my_team)
+            if player_ball_holder.number == 1:
+                if me in free_players[:4]:
+                    move_order = inspector.make_order_move_max_speed(player_ball_holder.position)
+                    return [move_order]
             move_order = inspector.make_order_move_max_speed(move_dest)
             return [move_order]
 
@@ -110,6 +103,10 @@ class MyBot(lugo4py.Bot, ABC):
         try:
             position = inspector.get_ball().position
 
+            if state == lugo4py.PLAYER_STATE.HOLDING_THE_BALL:
+                free_players = self.get_free_allies(inspector, 500)
+                kick_order = inspector.make_order_kick_max_speed(free_players[0].position)
+                return [kick_order]
             if state != lugo4py.PLAYER_STATE.DISPUTING_THE_BALL:
                 position = self.mapper.get_attack_goal().get_center()
 
@@ -128,3 +125,73 @@ class MyBot(lugo4py.Bot, ABC):
         max_distance = 2
         return abs(region_origin.get_row() - dest_origin.get_row()) <= max_distance and abs(
             region_origin.get_col() - dest_origin.get_col()) <= max_distance
+    
+    def find_best_shot_target(self, inspector: lugo4py.GameSnapshotInspector) -> lugo4py.Point:
+
+        opponent_goal = self.mapper.get_attack_goal()
+        goal_top_pole = opponent_goal.get_top_pole()
+        goal_bottom_pole = opponent_goal.get_bottom_pole()
+        
+        # Encontra o goleiro adversário (geralmente, o jogador número 1)
+        goalkeeper = inspector.get_opponent_goalkeeper()
+
+        # Se não houver goleiro, mira no canto superior por padrão
+        if not goalkeeper:
+            return goal_top_pole
+
+        # --- Início do Cálculo ---
+
+        # Constante para o alcance do goleiro
+        KEEPER_REACH = lugo4py.PLAYER_SIZE * 1.5 
+
+        # 1. Calcular os limites de cobertura do goleiro na linha do gol
+        gk_coverage_top = goalkeeper.position.y + KEEPER_REACH
+        gk_coverage_bottom = goalkeeper.position.y - KEEPER_REACH
+
+        # 2. Calcular o tamanho dos espaços livres ("gaps")
+        # Garante que o gap não seja negativo usando max(0, ...)
+        top_gap = max(0, goal_top_pole.y - gk_coverage_top)
+        bottom_gap = max(0, gk_coverage_bottom - goal_bottom_pole.y)
+
+        # 3. Decidir onde chutar
+        # O alvo será o meio do maior gap
+        target_pos = opponent_goal.get_center()
+
+        if top_gap > bottom_gap:
+            # Mira no meio do gap superior
+            target_pos.y = round(goal_top_pole.y + lugo4py.BALL_SIZE)
+            print(f"BOT {self.number}: Mirando no CANTO SUPERIOR!")
+        else:
+            # Mira no meio do gap inferior
+            target_pos.y = round(goal_bottom_pole.y + lugo4py.BALL_SIZE)
+            print(f"BOT {self.number}: Mirando no CANTO INFERIOR!")
+
+        # Garante que o chute não seja direcionado para fora do gol
+        target_pos.y = max(goal_bottom_pole.y, min(goal_top_pole.y, target_pos.y))
+        
+        return target_pos
+
+    def get_closest_players(self, point, player_list):
+
+        sortKey = lambda player: lugo4py.geo.distance_between_points(point, player.position)
+
+        closest_players = sorted(player_list, key=sortKey)
+        return closest_players
+    
+    def get_free_allies(self, inspector: lugo4py.GameSnapshotInspector, dist):
+        my_team = inspector.get_my_team_players()
+        opponent_team = inspector.get_opponent_players()
+
+        free_players = []
+        for ally in my_team:
+            is_free = True
+            for opponent in opponent_team:
+                distance_to_opponent = lugo4py.geo.distance_between_points(ally.position, opponent.position)
+                if  distance_to_opponent <= dist:
+                    is_free = False
+            
+            if is_free and ally.number != 1 and ally.number != self.number:
+                free_players.append(ally)
+
+        free_players.sort(key=lambda p: (p.position.x, p.position.y))
+        return free_players
