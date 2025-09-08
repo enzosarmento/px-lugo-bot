@@ -132,41 +132,26 @@ class MyBot(lugo4py.Bot, ABC):
         goal_top_pole = opponent_goal.get_top_pole()
         goal_bottom_pole = opponent_goal.get_bottom_pole()
         
-        # Encontra o goleiro adversário (geralmente, o jogador número 1)
         goalkeeper = inspector.get_opponent_goalkeeper()
 
-        # Se não houver goleiro, mira no canto superior por padrão
         if not goalkeeper:
             return goal_top_pole
 
-        # --- Início do Cálculo ---
-
-        # Constante para o alcance do goleiro
         KEEPER_REACH = lugo4py.PLAYER_SIZE * 1.5 
 
-        # 1. Calcular os limites de cobertura do goleiro na linha do gol
         gk_coverage_top = goalkeeper.position.y + KEEPER_REACH
         gk_coverage_bottom = goalkeeper.position.y - KEEPER_REACH
 
-        # 2. Calcular o tamanho dos espaços livres ("gaps")
-        # Garante que o gap não seja negativo usando max(0, ...)
         top_gap = max(0, goal_top_pole.y - gk_coverage_top)
         bottom_gap = max(0, gk_coverage_bottom - goal_bottom_pole.y)
 
-        # 3. Decidir onde chutar
-        # O alvo será o meio do maior gap
         target_pos = opponent_goal.get_center()
 
         if top_gap > bottom_gap:
-            # Mira no meio do gap superior
             target_pos.y = round(goal_top_pole.y + lugo4py.BALL_SIZE)
-            print(f"BOT {self.number}: Mirando no CANTO SUPERIOR!")
         else:
-            # Mira no meio do gap inferior
             target_pos.y = round(goal_bottom_pole.y + lugo4py.BALL_SIZE)
-            print(f"BOT {self.number}: Mirando no CANTO INFERIOR!")
 
-        # Garante que o chute não seja direcionado para fora do gol
         target_pos.y = max(goal_bottom_pole.y, min(goal_top_pole.y, target_pos.y))
         
         return target_pos
