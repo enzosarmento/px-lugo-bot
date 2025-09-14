@@ -1,3 +1,4 @@
+import random
 import traceback
 from abc import ABC
 from typing import List
@@ -120,18 +121,61 @@ class MyBot(lugo4py.Bot, ABC):
 
     def as_goalkeeper(self, inspector: lugo4py.GameSnapshotInspector, state: lugo4py.PLAYER_STATE) -> List[lugo4py.Order]:
         try:
-            position = inspector.get_ball().position
+            ball_pos = inspector.get_ball().position
+            my_goal_center = self.mapper.get_defense_goal().get_center()
 
             if state == lugo4py.PLAYER_STATE.HOLDING_THE_BALL:
-                free_players = self.get_free_allies(inspector, 600)
-                kick_order = inspector.make_order_kick_max_speed(free_players[0].position)
-                return [kick_order]
-            if state != lugo4py.PLAYER_STATE.DISPUTING_THE_BALL:
-                position = self.mapper.get_attack_goal().get_center()
+                # Find free allies to pass the ball to
+                free_players = self.get_free_allies(inspector, 800)
+                if free_players:
+                    # Sort players by their x position to find the one furthest down the field
+                    side_factor = 1 if self.side == lugo4py.TeamSide.HOME else -1
+                    free_players.sort(key=lambda p: p.position.x * side_factor, reverse=True)
+                    
+                    target_player = free_players[0]
+                    kick_order = inspector.make_order_kick_max_speed(target_player.position)
+                    return [kick_order]
+                else:
+                    # If no one is free, kick the ball to the center of the field
+                    kick_order = inspector.make_order_kick_max_speed(lugo4py.Point(x=lugo4py.specs.FIELD_WIDTH / 2, y=lugo4py.specs.FIELD_HEIGHT / 2))
+                    return [kick_order]
 
-            my_order = inspector.make_order_move_max_speed(position)
+            # Add a small random oscillation to the target position
+            oscillation_x = random.randint(-50, 50)
+            oscillation_y = random.randint(-50, 50)
 
-            return [my_order, inspector.make_order_catch()]
+            # If the ball is far, the goalkeeper should stay in the center of the goal
+            if lugo4py.distance_between_points(my_goal_center, ball_pos) > lugo4py.specs.FIELD_WIDTH / 4:
+                target_pos = lugo4py.Point(x=my_goal_center.x + oscillation_x, y=my_goal_center.y + oscillation_y)
+                move_order = inspector.make_order_move_max_speed(target_pos)
+                return [move_order]
+
+            # If the ball is closer, the goalkeeper should move to intercept it on the goal line
+            target_y = ball_pos.y
+            
+            # Predict the ball's future y position
+            if inspector.get_ball().velocity.speed > 0:
+                # Simplified prediction: assume the ball will continue in a straight line for a few turns
+                future_ball_pos = lugo4py.Point(x=ball_pos.x, y=ball_pos.y)
+                ball_speed = inspector.get_ball().velocity.speed
+                ball_dir = inspector.get_ball().velocity.direction
+                for _ in range(3): # Predict 3 turns ahead
+                    ball_speed -= lugo4py.specs.BALL_DECELERATION
+                    if ball_speed < 0: ball_speed = 0
+                    future_ball_pos.x += ball_dir.x * ball_speed / 100
+                    future_ball_pos.y += ball_dir.y * ball_speed / 100
+                target_y = future_ball_pos.y
+
+            # Ensure the target y is within the goal posts
+            goal_top_y = self.mapper.get_defense_goal().get_top_pole().y
+            goal_bottom_y = self.mapper.get_defense_goal().get_bottom_pole().y
+            target_y = max(goal_bottom_y, min(goal_top_y, target_y))
+
+            target_pos = lugo4py.Point(x=my_goal_center.x + oscillation_x, y=target_y + oscillation_y)
+            
+            move_order = inspector.make_order_move_max_speed(target_pos)
+            catch_order = inspector.make_order_catch()
+            return [move_order, catch_order]
 
         except Exception as e:
             print(f'did not play this turn due to exception {e}')
