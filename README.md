@@ -1,177 +1,118 @@
-# Lugo - The Dummies Py
+# px-lugo-bot
 
-The Dummies PY is a Python implementation of a player (bot) for [Lugo](https://lugobots.dev) game.
+Este projeto é um bot de futebol para o simulador Lugo, escrito em Python. Ele utiliza a biblioteca [lugo4py](https://github.com/lugobots/lugo4py) para interagir com o ambiente do jogo.
 
-This bot was made using the [Python Client Player](https://github.com/lugobots/lugo4py).
+## Como baixar e rodar o projeto
 
-Use this bot as a starting point to a new one. 
+### Pré-requisitos
+- Python >= 3.9
+- Docker e Docker Compose (opcional, mas recomendado)
 
-## Dependencies
+### Instalação rápida (recomendado)
+1. Clone este repositório:
+    ```bash
+    git clone <url-do-repositorio>
+    cd px-lugo-bot
+    ```
+2. Execute o script de setup para instalar dependências e preparar o ambiente virtual:
+    - No Linux/Mac:
+      ```bash
+      ./setup.sh
+      ```
+    - No Windows:
+      ```powershell
+      .\setup.ps1
+      ```
+3. Para rodar o bot junto com o servidor Lugo, utilize:
+    ```bash
+    docker compose up
+    ```
+    Acesse [http://localhost:8080/](http://localhost:8080/) para assistir ao jogo.
 
-* Docker ([https://docs.docker.com/get-docker/](https://docs.docker.com/get-docker/))
-* Docker Compose ([https://docs.docker.com/compose/install/](https://docs.docker.com/compose/install/))
-* Python ≥ 3.9 [https://www.python.org/downloads/release/python-3912/](https://www.python.org/downloads/release/python-3912/)
+### Rodando localmente (avançado)
+Se quiser rodar o bot diretamente na sua máquina:
+1. Ative o ambiente virtual:
+    ```bash
+    source venv/bin/activate
+    ```
+2. Execute o bot:
+    ```bash
+    BOT_TEAM=home BOT_NUMBER=1 python3.9 src/main.py
+    ```
 
+## Estrutura do Projeto
+- `src/main.py`: Inicializa o bot.
+- `src/settings.py`: Configurações de posições e táticas.
+- `src/my_bot.py`: Lógica principal do bot (edite aqui para mudar o comportamento).
 
-### Quick Setup
-From the project root run the setup script according to your platform.
+## Principais métodos do `my_bot.py`
 
-* Windows:
+- `on_disputing`: Chamado quando a bola está disputada. O bot decide se tenta pegar a bola ou se posiciona.
+- `on_defending`: Chamado quando um adversário está com a bola. O bot pode pressionar, defender ou se reposicionar.
+- `on_holding`: Chamado quando o bot está com a bola. Decide se chuta, avança ou passa para um aliado.
+- `on_supporting`: Chamado quando um companheiro está com a bola. O bot apoia, se posiciona para receber passe ou defende.
+- `as_goalkeeper`: Chamado quando o bot é o goleiro. Decide se intercepta, passa ou se posiciona no gol.
+- `getting_ready`: Executado antes do início do jogo ou após um gol.
+
+Além desses, há funções auxiliares, que você pode criar para te auxiliar na construção da lógica do bot.
+
+## Como contribuir
+1. Faça um fork do projeto.
+2. Crie uma branch para sua feature ou correção:
+    ```bash
+    git checkout -b minha-feature
+    ```
+3. Faça suas alterações e envie um pull request.
+
+## Dicas
+- Consulte o arquivo `README.md` original para mais detalhes sobre o ambiente Lugo.
+- Edite o arquivo `src/my_bot.py` para alterar a inteligência do bot.
+- Comente e documente suas funções para facilitar a colaboração!
+
+## Dicas avançadas e extras
+
+### Configuração manual do ambiente Python (Linux/Mac)
+Se preferir configurar o ambiente manualmente:
 ```bash
-.\setup.ps1
-```
-
-* Linux/MacOS:
-```powershell
-./setup.sh
-```
-
-It will check if Python ≥ 3.9 is available, create and activate the `venv` folder and install the dependencies.
-
-## Manual Setup (Optional)
-
-### On Windows
-1. Download the Python 3.9 installer [https://www.python.org/downloads/release/python-3912/](https://www.python.org/downloads/release/python-3912/)
-2. On the Python installing wizard, remember to check the option to install the **Pip** tool
-3. On the project directory, run:
-```
-pip install virtualenv
-python.exe -m venv venv
-pip install -r requirements.txt
-```
-
-### On Linux or Mac
-```shell
-cd /path/to/your/project
 sudo apt install python3.9-venv
 python3.9 -m venv venv
-. venv/bin/activate
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Configure VS Code
+### Dicas para IDEs
+No VS Code, use o comando `Python: Create Environment` e selecione Python 3.9. Em IDEs JetBrains (PyCharm, etc), configure o interpretador do projeto para Python 3.9 e instale as dependências sugeridas.
 
-1. `ctrl + p`
-2. "Python: Create Environment"
-3. Venv
-4. Select Python3.9 
+### Sobre o Lugo
+Se você não conhece o Lugo, acesse [o site oficial](https://lugobots.ai) para entender as regras e o funcionamento do simulador.
 
-#### Configure IntellyJ IDE family (PyCharm, Idea, and others)
-
-(see [https://www.jetbrains.com/help/idea/configuring-local-python-interpreters.html](https://www.jetbrains.com/help/idea/configuring-local-python-interpreters.html))
-
-1. Click on File
-2. Project Structure
-3. Click on Project
-4. Select Python3.9 in the SDK list
-
-The IDE will ask you if you want to install the dependencies. 
-
-## Are you familiar with Lugo? 
-If not, before continuing, please visit [the project website](https://lugobots.dev) and read about the game.
-
-## Quick setup (if you do not want to download or clone the code)
-
-You may use the [SetupEnvPy](https://hub.docker.com/r/lugobots/setup-env-py) Docker image to set up the environment for you:
-
-## How to use this source code
-1. (optional to speed up next steps) Download the images that you will need
-   ```shell
-   docker pull lugobots/server
-   docker pull lugobots/the-dummies-go:latest
-   docker pull python:3.9-slim-bookworm
-   ```
-2. Run the builder service that will install the depencencies you need (**wait for the service to finish**):
-   ```sell 
-   docker compose up builder
-   ```
-3. **Test it out**: Before any change, make the Dummies Py play to ensure you are not working on a broken code.
-
-   ```shell 
-   docker compose up
-   ```
-   and open [http://localhost:8080/](http://localhost:8080/) to watch the game.
-4. **Now, make your changes**: (see :question:[How to change the bot](#how-to-edit-the-bot))
-5. Play again to see your changes results: 
-
-   ```sh 
-   docker compose up
-   ```
-6. **Are you ready to compete? Build your Docker image:** 
-    
-    ```sh 
-   docker build -f .lugo/Dockerfile -t repo.lugobots.ai/[bot handle]:[version] .
-   ```
-
-## How to edit the bot   
-
-### Main file [main.py](src/main.py)
-
-You will not change this file. It only initializes the bot.
-
-### Settings file [settings.py](src/settings.py)
-
-Settings file only stores configurations that will affect the player behaviour, e.g. positions, tactic, etc.
-
-### My bot [my_bot.py](src/my_bot.py)
-
-:eyes: This is the most important file!
-
-There will be 5 important methods that you must edit to change the bot behaviour.
-
-```python
-    def on_disputing(self, inspector: GameSnapshotInspector) -> List[Order]:
-        # on_disputing is called when no one has the ball possession
-        pass
-
-    @abstractmethod
-    def on_defending(self, inspector: GameSnapshotInspector) -> List[Order]:
-        # OnDefending is called when an opponent player has the ball possession
-        pass
-
-    @abstractmethod
-    def on_holding(self, inspector: GameSnapshotInspector) -> List[Order]:
-        # OnHolding is called when this bot has the ball possession
-        pass
-
-    @abstractmethod
-    def on_holding(self, inspector: GameSnapshotInspector) -> List[Order]:
-        # OnSupporting is called when a teammate player has the ball possession
-        pass
-
-    @abstractmethod
-    def as_goalkeeper(self, inspector: GameSnapshotInspector, state: PLAYER_STATE) -> List[Order]:
-        # AsGoalkeeper is only called when this bot is the goalkeeper (number 1). This method is called on every turn,
-        # and the player state is passed at the last parameter.
-        pass
-
-    @abstractmethod
-    def getting_ready(self, inspector: GameSnapshotInspector):
-        # getting_ready will be called before the game starts and after a goal event. You will only need to implement
-        # this method in very rare cases.
-        pass
+### Otimizando o uso do Docker
+Você pode baixar previamente as imagens necessárias para acelerar o setup:
+```bash
+docker pull lugobots/server
+docker pull lugobots/the-dummies-go:latest
+docker pull python:3.9-slim-bookworm
 ```
+Para instalar dependências via Docker Compose:
+```bash
+docker compose up builder
+```
+Depois, rode normalmente:
+```bash
+docker compose up
+```
+Acesse [http://localhost:8080/](http://localhost:8080/) para assistir ao jogo.
 
-## Running directly in your machine (:ninja: advanced) 
-
-If you want to run the Python code in your machine instead of inside the container, you definitely can do this.
-
-The command to start locally is `BOT_TEAM=home BOT_NUMBER=1 python3.9 main.py`. However, when you run the Docker compose 
-file, all players from both teams will start. Then, if you run another bot directly from your machine, it will not
-be allowed to join the game.
-
-But you also cannot start your bot before the game server has started.
-
-You have two options to run your bot locally.
-
-### Option 1 - comment out the bot from the Docker compose file
-
-You can edit the file `docker-compose.yml` and comment out the player 2 of the home team.
-
-The game server will wait all 11 players from both teams to connect before starting the game.
-
-### Option 2 - starting the game server first
-
-You can start _only_ the game server with the command `docker compose up -d game_server`. The game will wait for the players. Then, you
-start your local bot (`BOT_TEAM=home BOT_NUMBER=1 python3.9 main.py`), and finally start the rest of the players with the
-command `docker compose up`
+### Rodando o bot localmente com o servidor Docker
+Você pode iniciar apenas o servidor do jogo com:
+```bash
+docker compose up -d game_server
+```
+Depois, rode seu bot localmente:
+```bash
+BOT_TEAM=home BOT_NUMBER=1 python3.9 src/main.py
+```
+E, por fim, suba o restante dos bots:
+```bash
+docker compose up
+```
