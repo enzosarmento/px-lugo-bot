@@ -1,118 +1,117 @@
-# px-lugo-bot
+# Px Bot
 
-Este projeto é um bot de futebol para o simulador Lugo, escrito em Python. Ele utiliza a biblioteca [lugo4py](https://github.com/lugobots/lugo4py) para interagir com o ambiente do jogo.
+Este é um bot para o [Lugo](https://github.com/lugobots/lugo), um jogo de futebol de robôs 5x5. O bot foi desenvolvido em Python e utiliza a biblioteca `lugo4py`.
 
-## Como baixar e rodar o projeto
+## Como Começar
 
-### Pré-requisitos
-- Python >= 3.9
-- Docker e Docker Compose (opcional, mas recomendado)
+Primeiro, você precisa ter o código do projeto na sua máquina.
 
-### Instalação rápida (recomendado)
-1. Clone este repositório:
+```bash
+git clone https://github.com/enzosarmento/px_bot.git
+cd px_bot
+```
+
+## Como Rodar o Projeto
+
+### Rodando com Docker (Recomendado)
+
+Esta é a maneira mais simples de rodar o projeto, pois já configura todo o ambiente necessário, incluindo o servidor do jogo. Você não precisa executar o `main.py` manualmente.
+
+1.  **Tenha o Docker e o Docker Compose instalados.**
+
+2.  **(Opcional) Baixe as imagens Docker para acelerar o processo:**
+
     ```bash
-    git clone <url-do-repositorio>
-    cd px-lugo-bot
+    docker pull lugobots/server
+    docker pull lugobots/the-dummies-go:latest
+    docker pull python:3.9-slim-buster
     ```
-2. Execute o script de setup para instalar dependências e preparar o ambiente virtual:
-    - No Linux/Mac:
-      ```bash
-      ./setup.sh
-      ```
-    - No Windows:
-      ```powershell
-      .\setup.ps1
-      ```
-3. Para rodar o bot junto com o servidor Lugo, utilize:
+
+3.  **Execute o serviço do construtor para instalar as dependências:**
+
+    Este comando irá construir a imagem do bot com todas as dependências necessárias. Espere até que ele seja concluído.
+
+    ```bash
+    docker compose up builder
+    ```
+
+4.  **Execute o jogo:**
+
     ```bash
     docker compose up
     ```
-    Acesse [http://localhost:8080/](http://localhost:8080/) para assistir ao jogo.
 
-### Rodando localmente (avançado)
-Se quiser rodar o bot diretamente na sua máquina:
-1. Ative o ambiente virtual:
+5.  **Abra o navegador em [http://localhost:8080](http://localhost:8080)** para assistir ao jogo.
+
+### Rodando Localmente para Desenvolvimento
+
+Esta abordagem é ideal para quando você está desenvolvendo e testando o bot. Você precisará de um ambiente Python configurado.
+
+1.  **Crie um ambiente virtual:**
+
+    A biblioteca `lugo4py` pode ter conflitos com outras bibliotecas, então é altamente recomendado usar um ambiente virtual.
+
     ```bash
-    source venv/bin/activate
+    python -m venv .venv
+    source .venv/bin/activate  # No Windows, use `.venv\Scripts\activate`
     ```
-2. Execute o bot:
+
+2.  **Instale as dependências:**
+
     ```bash
-    BOT_TEAM=home BOT_NUMBER=1 python3.9 src/main.py
+    pip install -r requirements.txt
     ```
 
-## Estrutura do Projeto
-- `src/main.py`: Inicializa o bot.
-- `src/settings.py`: Configurações de posições e táticas.
-- `src/my_bot.py`: Lógica principal do bot (edite aqui para mudar o comportamento).
+3.  **Execute o bot:**
 
-## Principais métodos do `my_bot.py`
+    Você precisará ter o servidor do Lugo rodando separadamente (por exemplo, via Docker). Então, você pode rodar o bot:
 
-- `on_disputing`: Chamado quando a bola está disputada. O bot decide se tenta pegar a bola ou se posiciona.
-- `on_defending`: Chamado quando um adversário está com a bola. O bot pode pressionar, defender ou se reposicionar.
-- `on_holding`: Chamado quando o bot está com a bola. Decide se chuta, avança ou passa para um aliado.
-- `on_supporting`: Chamado quando um companheiro está com a bola. O bot apoia, se posiciona para receber passe ou defende.
-- `as_goalkeeper`: Chamado quando o bot é o goleiro. Decide se intercepta, passa ou se posiciona no gol.
-- `getting_ready`: Executado antes do início do jogo ou após um gol.
-
-Além desses, há funções auxiliares, que você pode criar para te auxiliar na construção da lógica do bot.
-
-## Como contribuir
-1. Faça um fork do projeto.
-2. Crie uma branch para sua feature ou correção:
     ```bash
-    git checkout -b minha-feature
+    python src/main.py
     ```
-3. Faça suas alterações e envie um pull request.
 
-## Dicas
-- Consulte o arquivo `README.md` original para mais detalhes sobre o ambiente Lugo.
-- Edite o arquivo `src/my_bot.py` para alterar a inteligência do bot.
-- Comente e documente suas funções para facilitar a colaboração!
+## Ferramentas Úteis
 
-## Dicas avançadas e extras
+### Lugo Studio
 
-### Configuração manual do ambiente Python (Linux/Mac)
-Se preferir configurar o ambiente manualmente:
-```bash
-sudo apt install python3.9-venv
-python3.9 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+Na pasta `lugo_studio` você encontrará o **Lugo Studio**, uma ferramenta para ajudar no desenvolvimento e análise do seu bot. Existe um instalador para Windows e um AppImage para Linux.
 
-### Dicas para IDEs
-No VS Code, use o comando `Python: Create Environment` e selecione Python 3.9. Em IDEs JetBrains (PyCharm, etc), configure o interpretador do projeto para Python 3.9 e instale as dependências sugeridas.
+**Importante:** Se você utilizar o Lugo Studio, não é necessário rodar os comandos do Docker manualmente. O próprio Lugo Studio cuidará de iniciar os contêineres, mas você **ainda precisa ter o Docker instalado** na sua máquina.
 
-### Sobre o Lugo
-Se você não conhece o Lugo, acesse [o site oficial](https://lugobots.ai) para entender as regras e o funcionamento do simulador.
+### Criador de Estratégias
 
-### Otimizando o uso do Docker
-Você pode baixar previamente as imagens necessárias para acelerar o setup:
-```bash
-docker pull lugobots/server
-docker pull lugobots/the-dummies-go:latest
-docker pull python:3.9-slim-bookworm
-```
-Para instalar dependências via Docker Compose:
-```bash
-docker compose up builder
-```
-Depois, rode normalmente:
-```bash
-docker compose up
-```
-Acesse [http://localhost:8080/](http://localhost:8080/) para assistir ao jogo.
+Para ajudar a criar e visualizar as posições táticas dos jogadores, você pode usar esta ferramenta online:
 
-### Rodando o bot localmente com o servidor Docker
-Você pode iniciar apenas o servidor do jogo com:
-```bash
-docker compose up -d game_server
-```
-Depois, rode seu bot localmente:
-```bash
-BOT_TEAM=home BOT_NUMBER=1 python3.9 src/main.py
-```
-E, por fim, suba o restante dos bots:
-```bash
-docker compose up
-```
+[**Strategy Creator for Lugo Bots**](https://mauriciorobertodev.github.io/strategy-creator-lugo-bots/)
+
+## Como Contribuir
+
+Contribuições são bem-vindas! Se você quiser melhorar este bot, siga os passos abaixo:
+
+1.  **Faça um fork do projeto.**
+2.  **Crie uma nova branch para sua feature:** `git checkout -b feature/nova-feature`
+3.  **Faça suas alterações e commit:** `git commit -m 'Adiciona nova feature'`
+4.  **Envie para a sua branch:** `git push origin feature/nova-feature`
+5.  **Abra um Pull Request.**
+
+## Funcionalidades (`my_bot.py`)
+
+O arquivo `my_bot.py` contém a lógica principal do bot. Ele é dividido em vários métodos que são chamados dependendo do estado do jogo.
+
+### Principais Métodos
+
+*   `on_disputing(...)`: Chamado quando a bola está em disputa. O bot decide se tenta pegar a bola ou se posiciona.
+*   `on_defending(...)`: Chamado quando o time adversário tem a posse da bola. O bot decide se pressiona o adversário ou mantém a posição defensiva.
+*   `on_holding(...)`: Chamado quando o bot tem a posse da bola. Ele decide se chuta para o gol, avança ou passa para um companheiro.
+*   `on_supporting(...)`: Chamado quando um companheiro de time tem a posse da bola. O bot se posiciona para receber um passe ou para apoiar o jogador.
+*   `as_goalkeeper(...)`: Lógica específica para o goleiro. Decide se passa a bola, intercepta um chute ou se posiciona no gol.
+*   `dynamic_defensive_position(...)`: Calcula uma posição defensiva dinâmica com base na posição da bola, para que a defesa se mova em bloco.
+*   `find_best_shot_target(...)`: Encontra o melhor lugar para chutar no gol, tentando evitar o goleiro adversário.
+
+## Configurações (`settings.py`)
+
+O arquivo `settings.py` é usado para definir as posições e táticas do time.
+
+*   `MAPPER_COLS` e `MAPPER_ROWS`: Definem o número de "regiões" no campo. Quanto maior o número, mais preciso será o posicionamento dos jogadores.
+*   `PLAYER_INITIAL_POSITIONS`: Um dicionário que define a posição inicial de cada jogador no campo.
+*   `get_my_expected_position(...)`: Esta função determina a posição que o jogador deve ocupar com base no estado do jogo (defensivo, normal ou ofensivo). A tática muda dependendo da posição da bola no campo.
