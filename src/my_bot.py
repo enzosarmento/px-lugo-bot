@@ -80,9 +80,21 @@ class MyBot(lugo4py.Bot, ABC):
         try:
             me = inspector.get_me()
             opponent_goal = self.mapper.get_attack_goal()
-            dist_to_goal = lugo4py.distance_between_points(me.position, opponent_goal.get_center())
 
-            if dist_to_goal <= lugo4py.GOAL_ZONE_RANGE + lugo4py.BALL_SIZE * 4:
+            goal_line_x = opponent_goal.get_center().x
+            x_dist = abs(me.position.x - goal_line_x)
+
+            # Condição para chutar: perto da linha do gol e com ângulo razoável
+            should_shoot = False
+            if x_dist < lugo4py.GOAL_ZONE_RANGE * 1.5:
+                goal_top_y = opponent_goal.get_top_pole().y
+                goal_bottom_y = opponent_goal.get_bottom_pole().y
+                margin = 400  # Margem para permitir chutes da lateral
+                
+                if (goal_bottom_y - margin) < me.position.y < (goal_top_y + margin):
+                    should_shoot = True
+
+            if should_shoot:
                 my_order = inspector.make_order_kick_max_speed(self.find_best_shot_target(inspector))
                 return [my_order]
 
