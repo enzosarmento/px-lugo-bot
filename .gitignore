@@ -6,3 +6,4 @@ __pycache__/
 .lugo/
 .devcontainer/
 lugo4py_temp/
+lugo4py/
