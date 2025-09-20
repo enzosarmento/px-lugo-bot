@@ -81,6 +81,25 @@ class MyBot(lugo4py.Bot, ABC):
             me = inspector.get_me()
             opponent_goal = self.mapper.get_attack_goal()
 
+            if me.number in DEF_PLAYERS:
+                # Zagueiros com a bola devem passar para um jogador de meio/ataque livre
+                free_allies = self.get_free_allies(inspector, 600)
+                
+                non_defenders = [p for p in free_allies if p.number not in DEF_PLAYERS]
+
+                if non_defenders:
+                    # Passa para o jogador de meio/ataque livre mais avançado
+                    side_factor = 1 if self.side == lugo4py.TeamSide.HOME else -1
+                    non_defenders.sort(key=lambda p: p.position.x * side_factor, reverse=True)
+                    
+                    target_player = non_defenders[0]
+                    kick_order = inspector.make_order_kick_max_speed(target_player.position)
+                    return [kick_order]
+                else:
+                    # Se não houver jogadores livres, chuta para o meio do campo
+                    kick_order = inspector.make_order_kick_max_speed(lugo4py.Point(x=lugo4py.specs.FIELD_WIDTH / 2, y=lugo4py.specs.FIELD_HEIGHT / 2))
+                    return [kick_order]
+
             goal_line_x = opponent_goal.get_center().x
             x_dist = abs(me.position.x - goal_line_x)
 
