@@ -247,16 +247,14 @@ class MyBot(lugo4py.Bot, ABC):
         center_y = my_goal_center.y + (ball_pos.y - my_goal_center.y) * 0.7
         spacing = 900  # Espaçamento lateral entre os defensores
 
-        if player_number == 2:   # Lateral
-            pos_y = center_y - spacing * 1.5
-        elif player_number == 3: # Zagueiro
-            pos_y = center_y - spacing * 0.5
-        elif player_number == 4: # Zagueiro
-            pos_y = center_y + spacing * 0.5
-        elif player_number == 5: # Lateral
-            pos_y = center_y + spacing * 1.5
-        else:
-            pos_y = center_y
+        # As posições dos defensores são invertidas quando o time é AWAY
+        if self.side == lugo4py.TeamSide.HOME:
+            offsets = {2: -1.5, 3: -0.5, 4: 0.5, 5: 1.5}
+        else:  # AWAY
+            offsets = {2: 1.5, 3: 0.5, 4: -0.5, 5: -1.5}
+
+        offset = offsets.get(player_number, 0)
+        pos_y = center_y + offset * spacing
         
         pos_y = max(200, min(lugo4py.specs.FIELD_HEIGHT - 200, pos_y))
         return lugo4py.Point(x=round(defense_line_x), y=round(pos_y))
