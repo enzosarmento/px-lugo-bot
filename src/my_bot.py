@@ -27,7 +27,8 @@ class MyBot(lugo4py.Bot, ABC):
             catchers = closest_players[:n_catchers]
             if me in catchers:
                 # Se estou entre os mais próximos, vou em direção à bola
-                move_order = inspector.make_order_move_max_speed(ball_position)
+                target_pos = self.predict_ball_future_position(inspector, 5)
+                move_order = inspector.make_order_move_max_speed(target_pos)
             else:
                 # Caso contrário, me posiciono na posição esperada
                 move_order = inspector.make_order_move_max_speed(get_my_expected_position(inspector, self.mapper, self.number))
@@ -105,10 +106,10 @@ class MyBot(lugo4py.Bot, ABC):
 
             # Condição para chutar: perto da linha do gol e com ângulo razoável
             should_shoot = False
-            if x_dist < lugo4py.GOAL_ZONE_RANGE * 1.5:
+            if x_dist < lugo4py.GOAL_ZONE_RANGE * 1.3:
                 goal_top_y = opponent_goal.get_top_pole().y
                 goal_bottom_y = opponent_goal.get_bottom_pole().y
-                margin = 400  # Margem para permitir chutes da lateral
+                margin = 450  # Margem para permitir chutes da lateral
                 
                 if (goal_bottom_y - margin) < me.position.y < (goal_top_y + margin):
                     should_shoot = True
@@ -117,17 +118,23 @@ class MyBot(lugo4py.Bot, ABC):
                 my_order = inspector.make_order_kick_max_speed(self.find_best_shot_target(inspector))
                 return [my_order]
 
-            # Se estou marcado, tento passar a bola
-            if self.is_marked(inspector, me, 700):
-                free_players = self.get_free_allies(inspector, 600)
-                if free_players:
-                    # Prioriza passar para o jogador mais avançado (eixo x)
-                    side_factor = 1 if self.side == lugo4py.TeamSide.HOME else -1
-                    free_players.sort(key=lambda p: p.position.x * side_factor, reverse=True)
+            if not self.is_marked(inspector, me, 700):
+                return [inspector.make_order_move_max_speed(opponent_goal.get_center())]
 
-                    target_player = free_players[0]
-                    kick_order = inspector.make_order_kick_max_speed(target_player.position)
-                    return [kick_order]
+            # 3. Driblar se não puder avançar
+            dribble_pos = self.find_dribble_position(inspector)
+            if dribble_pos:
+                return [inspector.make_order_move_max_speed(dribble_pos)]
+
+            free_players = self.get_free_allies(inspector, 600)
+            if free_players:
+                # Prioriza passar para o jogador mais avançado (eixo x)
+                side_factor = 1 if self.side == lugo4py.TeamSide.HOME else -1
+                free_players.sort(key=lambda p: p.position.x * side_factor, reverse=True)
+
+                target_player = free_players[0]
+                kick_order = inspector.make_order_kick_max_speed(target_player.position)
+                return [kick_order]
 
             # Se não estou marcado ou não achei passe, continuo avançando
             my_order = inspector.make_order_move_max_speed(opponent_goal.get_center())
@@ -251,6 +258,110 @@ class MyBot(lugo4py.Bot, ABC):
         max_distance = 2
         return abs(region_origin.get_row() - dest_origin.get_row()) <= max_distance and abs(
             region_origin.get_col() - dest_origin.get_col()) <= max_distance
+    
+    def find_support_position(self, inspector: lugo4py.GameSnapshotInspector, ball_holder: lugo4py.Player) -> lugo4py.Point:
+        """
+        Encontra a melhor posição para dar suporte ao jogador com a posse de bola.
+        """
+        best_pos = None
+        max_dist_to_opp = -1
+
+        # Gera pontos candidatos ao redor do portador da bola
+        for angle in range(0, 360, 45):
+            rad = angle * 3.14159 / 180
+            dist = 800
+            candidate_pos = lugo4py.Point(
+                x=ball_holder.position.x + dist * math.cos(rad),
+                y=ball_holder.position.y + dist * math.sin(rad)
+            )
+
+            # Verifica se a posição candidata está dentro do campo
+            if not (0 < candidate_pos.x < lugo4py.specs.FIELD_WIDTH and 0 < candidate_pos.y < lugo4py.specs.FIELD_HEIGHT):
+                continue
+
+            # Encontra o oponente mais próximo da posição candidata
+            opponents = inspector.get_opponent_players()
+            closest_opp_dist = float('inf')
+            if opponents:
+                for opp in opponents:
+                    d = lugo4py.geo.distance_between_points(candidate_pos, opp.position)
+                    if d < closest_opp_dist:
+                        closest_opp_dist = d
+            
+            # Queremos a posição que está mais longe de qualquer oponente
+            if closest_opp_dist > max_dist_to_opp:
+                max_dist_to_opp = closest_opp_dist
+                best_pos = candidate_pos
+
+        if best_pos:
+            return best_pos
+        else:
+            # Como alternativa, volta para uma posição atrás do portador da bola
+            goal_direction = -1 if self.side == lugo4py.TeamSide.HOME else 1
+            return lugo4py.Point(x=ball_holder.position.x + (goal_direction * 500), y=ball_holder.position.y)
+
+    def predict_ball_future_position(self, inspector: lugo4py.GameSnapshotInspector, turns: int) -> lugo4py.Point:
+        """
+        Prevê a posição futura da bola, considerando a desaceleração.
+        """
+        ball = inspector.get_ball()
+        future_pos = lugo4py.Point(x=ball.position.x, y=ball.position.y)
+        ball_speed = ball.velocity.speed
+        ball_dir = ball.velocity.direction
+
+        for _ in range(turns):
+            ball_speed -= lugo4py.specs.BALL_DECELERATION
+            if ball_speed < 0:
+                ball_speed = 0
+            
+            # A velocidade é dada em unidades por 100 turnos, então dividimos por 100
+            future_pos.x += ball_dir.x * ball_speed / 100
+            future_pos.y += ball_dir.y * ball_speed / 100
+
+        return future_pos
+    
+    def find_dribble_position(self, inspector: lugo4py.GameSnapshotInspector) -> lugo4py.Point:
+        """
+        Encontra a melhor posição para driblar, se movendo para um local próximo e livre.
+        Retorna None se nenhum local seguro para drible for encontrado.
+        """
+        me = inspector.get_me()
+        best_pos = None
+        max_dist_to_opp = -1
+
+        # Gera pontos candidatos ao redor do jogador
+        for angle in range(-90, 91, 45):  # Apenas para frente e para os lados
+            rad = angle * 3.14159 / 180
+            dist = 400 # Distância curta para o drible
+            
+            if self.side == lugo4py.TeamSide.AWAY:
+                rad += 3.14159
+
+            candidate_pos = lugo4py.Point(
+                x=me.position.x + dist * math.cos(rad),
+                y=me.position.y + dist * math.sin(rad)
+            )
+
+            if not (0 < candidate_pos.x < lugo4py.specs.FIELD_WIDTH and 0 < candidate_pos.y < lugo4py.specs.FIELD_HEIGHT):
+                continue
+
+            opponents = inspector.get_opponent_players()
+            closest_opp_dist = float('inf')
+            if opponents:
+                for opp in opponents:
+                    d = lugo4py.geo.distance_between_points(candidate_pos, opp.position)
+                    if d < closest_opp_dist:
+                        closest_opp_dist = d
+            
+            if closest_opp_dist > max_dist_to_opp:
+                max_dist_to_opp = closest_opp_dist
+                best_pos = candidate_pos
+
+        # Só retorna uma posição de drible se ela for significativamente mais segura
+        if max_dist_to_opp > 600:
+            return best_pos
+
+        return None
 
     def dynamic_defensive_position(self, inspector: lugo4py.GameSnapshotInspector, player_number: int) -> lugo4py.Point:
         """
@@ -347,47 +458,6 @@ class MyBot(lugo4py.Bot, ABC):
                 if not is_behind:
                     return True
         return False
-
-    def find_support_position(self, inspector: lugo4py.GameSnapshotInspector, ball_holder: lugo4py.Player) -> lugo4py.Point:
-        """
-        Encontra a melhor posição para dar suporte ao jogador com a posse de bola.
-        """
-        best_pos = None
-        max_dist_to_opp = -1
-
-        # Gera pontos candidatos ao redor do portador da bola
-        for angle in range(0, 360, 45):
-            rad = angle * 3.14159 / 180
-            dist = 800
-            candidate_pos = lugo4py.Point(
-                x=ball_holder.position.x + dist * math.cos(rad),
-                y=ball_holder.position.y + dist * math.sin(rad)
-            )
-
-            # Verifica se a posição candidata está dentro do campo
-            if not (0 < candidate_pos.x < lugo4py.specs.FIELD_WIDTH and 0 < candidate_pos.y < lugo4py.specs.FIELD_HEIGHT):
-                continue
-
-            # Encontra o oponente mais próximo da posição candidata
-            opponents = inspector.get_opponent_players()
-            closest_opp_dist = float('inf')
-            if opponents:
-                for opp in opponents:
-                    d = lugo4py.geo.distance_between_points(candidate_pos, opp.position)
-                    if d < closest_opp_dist:
-                        closest_opp_dist = d
-            
-            # Queremos a posição que está mais longe de qualquer oponente
-            if closest_opp_dist > max_dist_to_opp:
-                max_dist_to_opp = closest_opp_dist
-                best_pos = candidate_pos
-
-        if best_pos:
-            return best_pos
-        else:
-            # Como alternativa, volta para uma posição atrás do portador da bola
-            goal_direction = -1 if self.side == lugo4py.TeamSide.HOME else 1
-            return lugo4py.Point(x=ball_holder.position.x + (goal_direction * 500), y=ball_holder.position.y)
 
     def get_closest_players(self, point: lugo4py.Point, player_list: List[lugo4py.Player]) -> List[lugo4py.Player]:
         """
