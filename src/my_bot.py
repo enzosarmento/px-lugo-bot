@@ -106,10 +106,10 @@ class MyBot(lugo4py.Bot, ABC):
 
             # Condição para chutar: perto da linha do gol e com ângulo razoável
             should_shoot = False
-            if x_dist < lugo4py.GOAL_ZONE_RANGE * 1.3:
+            if x_dist < lugo4py.GOAL_ZONE_RANGE * 1.5:
                 goal_top_y = opponent_goal.get_top_pole().y
                 goal_bottom_y = opponent_goal.get_bottom_pole().y
-                margin = 600  # Margem para permitir chutes da lateral
+                margin = 400  # Margem para permitir chutes da lateral
                 
                 if (goal_bottom_y - margin) < me.position.y < (goal_top_y + margin):
                     should_shoot = True
@@ -120,12 +120,7 @@ class MyBot(lugo4py.Bot, ABC):
 
             if not self.is_marked(inspector, me, 700):
                 return [inspector.make_order_move_max_speed(opponent_goal.get_center())]
-
-            # 3. Driblar se não puder avançar
-            dribble_pos = self.find_dribble_position(inspector)
-            if dribble_pos:
-                return [inspector.make_order_move_max_speed(dribble_pos)]
-
+            
             free_players = self.get_free_allies(inspector, 600)
             if free_players:
                 # Prioriza passar para o jogador mais avançado (eixo x)
@@ -135,6 +130,13 @@ class MyBot(lugo4py.Bot, ABC):
                 target_player = free_players[0]
                 kick_order = inspector.make_order_kick_max_speed(target_player.position)
                 return [kick_order]
+
+            # Driblar se não puder passar
+            dribble_pos = self.find_dribble_position(inspector)
+            if dribble_pos:
+                return [inspector.make_order_move_max_speed(dribble_pos)]
+
+            
 
             # Se não estou marcado ou não achei passe, continuo avançando
             my_order = inspector.make_order_move_max_speed(opponent_goal.get_center())
