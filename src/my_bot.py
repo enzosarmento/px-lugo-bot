@@ -109,7 +109,7 @@ class MyBot(lugo4py.Bot, ABC):
             if x_dist < lugo4py.GOAL_ZONE_RANGE * 1.5:
                 goal_top_y = opponent_goal.get_top_pole().y
                 goal_bottom_y = opponent_goal.get_bottom_pole().y
-                margin = 400  # Margem para permitir chutes da lateral
+                margin = 500  # Margem para permitir chutes da lateral
                 
                 if (goal_bottom_y - margin) < me.position.y < (goal_top_y + margin):
                     should_shoot = True
@@ -211,16 +211,15 @@ class MyBot(lugo4py.Bot, ABC):
                     kick_order = inspector.make_order_kick_max_speed(lugo4py.Point(x=lugo4py.specs.FIELD_WIDTH / 2, y=lugo4py.specs.FIELD_HEIGHT / 2))
                     return [kick_order]
 
-            oscillation_x = random.randint(-50, 50)
             oscillation_y = random.randint(-50, 50)
 
             if lugo4py.distance_between_points(my_goal_center, ball_pos) > lugo4py.specs.FIELD_WIDTH / 4:
-                target_pos = lugo4py.Point(x=my_goal_center.x + oscillation_x, y=my_goal_center.y + oscillation_y)
+                target_pos = lugo4py.Point(x=my_goal_center.x, y=my_goal_center.y + oscillation_y)
                 move_order = inspector.make_order_move_max_speed(target_pos)
                 return [move_order]
 
             target_y = ball_pos.y
-
+            predicted_ball_pos = None
             if inspector.get_ball().velocity.speed > 100:  # Só reage a bolas mais rápidas
                 predicted_ball_pos = self.predict_ball_interception_point(inspector)
                 if predicted_ball_pos:
@@ -228,13 +227,20 @@ class MyBot(lugo4py.Bot, ABC):
 
             goal_top_y = self.mapper.get_defense_goal().get_top_pole().y
             goal_bottom_y = self.mapper.get_defense_goal().get_bottom_pole().y
-            target_y = max(goal_bottom_y, min(goal_top_y, target_y))
-
-            target_pos = lugo4py.Point(x=my_goal_center.x + oscillation_x, y=target_y + oscillation_y)
             
-            move_order = inspector.make_order_move_max_speed(target_pos)
+            half_keeper_width = 920 / 2 + 100
+
+            min_y = goal_bottom_y + half_keeper_width
+            max_y = goal_top_y - half_keeper_width
+
+            target_y = max(min_y, min(max_y, target_y + oscillation_y))
+            
+            target_pos = lugo4py.Point(x=my_goal_center.x, y=target_y)
+
             catch_order = inspector.make_order_catch()
-            return [move_order, catch_order]
+            jump_order = inspector.make_order_jump(target_pos, lugo4py.GOALKEEPER_JUMP_SPEED)
+
+            return [jump_order, catch_order]
 
         except Exception as e:
             print(f'did not play this turn due to exception {e}')
