@@ -109,7 +109,7 @@ class MyBot(lugo4py.Bot, ABC):
             if x_dist < lugo4py.GOAL_ZONE_RANGE * 1.3:
                 goal_top_y = opponent_goal.get_top_pole().y
                 goal_bottom_y = opponent_goal.get_bottom_pole().y
-                margin = 450  # Margem para permitir chutes da lateral
+                margin = 600  # Margem para permitir chutes da lateral
                 
                 if (goal_bottom_y - margin) < me.position.y < (goal_top_y + margin):
                     should_shoot = True
@@ -218,17 +218,11 @@ class MyBot(lugo4py.Bot, ABC):
                 return [move_order]
 
             target_y = ball_pos.y
-            
-            if inspector.get_ball().velocity.speed > 0:
-                future_ball_pos = lugo4py.Point(x=ball_pos.x, y=ball_pos.y)
-                ball_speed = inspector.get_ball().velocity.speed
-                ball_dir = inspector.get_ball().velocity.direction
-                for _ in range(3):
-                    ball_speed -= lugo4py.specs.BALL_DECELERATION
-                    if ball_speed < 0: ball_speed = 0
-                    future_ball_pos.x += ball_dir.x * ball_speed / 100
-                    future_ball_pos.y += ball_dir.y * ball_speed / 100
-                target_y = future_ball_pos.y
+
+            if inspector.get_ball().velocity.speed > 100:  # Só reage a bolas mais rápidas
+                predicted_ball_pos = self.predict_ball_interception_point(inspector)
+                if predicted_ball_pos:
+                    target_y = predicted_ball_pos.y
 
             goal_top_y = self.mapper.get_defense_goal().get_top_pole().y
             goal_bottom_y = self.mapper.get_defense_goal().get_bottom_pole().y
@@ -433,6 +427,46 @@ class MyBot(lugo4py.Bot, ABC):
             return target_top
         else:
             return target_bottom
+
+    def predict_ball_interception_point(self, inspector: lugo4py.GameSnapshotInspector) -> lugo4py.Point:
+        """
+        Prevê o ponto onde a bola cruzará a linha do gol.
+        Retorna None se a bola não estiver indo em direção ao gol.
+        """
+        ball = inspector.get_ball()
+        my_goal_center = self.mapper.get_defense_goal().get_center()
+        goal_line_x = my_goal_center.x
+
+        # Verifica se a bola está se movendo em direção ao nosso gol
+        side_factor = 1 if self.side == lugo4py.TeamSide.HOME else -1
+        if ball.velocity.direction.x * side_factor > 0:
+            return None  # Bola se afastando
+
+        future_pos = lugo4py.Point(x=ball.position.x, y=ball.position.y)
+        ball_speed = ball.velocity.speed
+        ball_dir = ball.velocity.direction
+
+        for _ in range(30):  # Simula por no máximo 30 turnos
+            ball_speed -= lugo4py.specs.BALL_DECELERATION
+            if ball_speed <= 0:
+                break
+            
+            future_pos.x += ball_dir.x * ball_speed / 100
+            future_pos.y += ball_dir.y * ball_speed / 100
+
+            # Verifica se a bola cruzou a linha do gol
+            if (side_factor > 0 and future_pos.x <= goal_line_x) or \
+               (side_factor < 0 and future_pos.x >= goal_line_x):
+                
+                # Interpolação para encontrar o ponto exato no cruzamento
+                overshoot = abs(future_pos.x - goal_line_x)
+                correction_factor = overshoot / abs(ball_dir.x * ball_speed / 100) if ball_dir.x != 0 else 0
+                
+                intercept_y = future_pos.y - (ball_dir.y * ball_speed / 100 * correction_factor)
+                
+                return lugo4py.Point(x=goal_line_x, y=intercept_y)
+        
+        return None
 
     def is_marked(self, inspector: lugo4py.GameSnapshotInspector, player: lugo4py.Player, dist: int) -> bool:
         """
