@@ -121,17 +121,21 @@ class MyBot(lugo4py.Bot, ABC):
             if not self.is_marked(inspector, me, 700):
                 return [inspector.make_order_move_max_speed(opponent_goal.get_center())]
             
+            # tocar a bola um pouco mais para frente
             free_players = self.get_free_allies(inspector, 600)
             if free_players:
-                # Prioriza passar para o jogador mais avançado (eixo x)
                 side_factor = 1 if self.side == lugo4py.TeamSide.HOME else -1
                 free_players.sort(key=lambda p: p.position.x * side_factor, reverse=True)
 
                 target_player = free_players[0]
-                kick_order = inspector.make_order_kick_max_speed(target_player.position)
+                target_pos = lugo4py.Point(
+                    x=target_player.position.x + (150 * side_factor),
+                    y=target_player.position.y
+                )
+                
+                kick_order = inspector.make_order_kick_max_speed(target_pos)
                 return [kick_order]
 
-            # Driblar se não puder passar
             dribble_pos = self.find_dribble_position(inspector)
             if dribble_pos:
                 return [inspector.make_order_move_max_speed(dribble_pos)]
@@ -155,6 +159,7 @@ class MyBot(lugo4py.Bot, ABC):
             me = inspector.get_me()
             ball_holder = inspector.get_ball_holder()
             my_team = inspector.get_my_team_players()
+            ball_pos = inspector.get_ball().position #posição da bola
 
             # Defensores tem uma lógica própria
             if me.number in DEF_PLAYERS:
@@ -164,7 +169,6 @@ class MyBot(lugo4py.Bot, ABC):
 
             # Se o goleiro do meu time está com a bola, me aproximo
             if ball_holder.number == 1:
-                my_team = inspector.get_my_team_players()
                 closest_players = self.get_closest_players(ball_holder.position, my_team)
                 if me in closest_players[:4]:
                     move_order = inspector.make_order_move_max_speed(ball_holder.position)
@@ -180,9 +184,23 @@ class MyBot(lugo4py.Bot, ABC):
                         support_pos = self.find_support_position(inspector, ball_holder)
                         move_order = inspector.make_order_move_max_speed(support_pos)
                         return [move_order]
+                    
+            
+            # Verifica se está campo de ataque e o cálculo de field_third foi ajustado para maior clareza
+            attack_direction_start = (lugo4py.specs.FIELD_WIDTH / 2)
+            if self.side == lugo4py.TeamSide.HOME:
+                is_in_attack_zone = ball_pos.x > attack_direction_start
+            else: 
+                is_in_attack_zone = ball_pos.x < attack_direction_start
 
-            # Caso contrário, me movo para a minha posição esperada
-            move_dest = get_my_expected_position(inspector, self.mapper, self.number)
+            if is_in_attack_zone:
+                # Se estamos atacando, procuro um espaço livre para receber o passe
+                move_dest = self.find_open_space_in_attack(inspector)
+            else:
+                # Caso contrário, me movo para a minha posição tática esperada
+                move_dest = get_my_expected_position(inspector, self.mapper, self.number)
+                
+            
             move_order = inspector.make_order_move_max_speed(move_dest)
             return [move_order]
 
@@ -530,3 +548,39 @@ class MyBot(lugo4py.Bot, ABC):
 
         free_players.sort(key=lambda p: (p.position.x, p.position.y))
         return free_players
+
+
+    #encontrar espaço receber e fazer passe
+    def find_open_space_in_attack(self, inspector: lugo4py.GameSnapshotInspector) -> lugo4py.Point:
+
+        me = inspector.get_me()
+        opponent_goal = self.mapper.get_attack_goal().get_center()
+        best_pos = None
+        best_score = -1
+
+        for i in range(1, 4):
+            side_factor = 1 if self.side == lugo4py.TeamSide.HOME else -1
+            dist_ahead = i * 600 
+            
+            candidate_points = [
+                lugo4py.Point(x=me.position.x + dist_ahead * side_factor, y=me.position.y),
+                lugo4py.Point(x=me.position.x + dist_ahead * side_factor, y=me.position.y + 400),
+                lugo4py.Point(x=me.position.x + dist_ahead * side_factor, y=me.position.y - 400),
+            ]
+            
+            for point in candidate_points:
+                if not (0 < point.x < lugo4py.specs.FIELD_WIDTH and 0 < point.y < lugo4py.specs.FIELD_HEIGHT):
+                    continue
+
+                opponents = inspector.get_opponent_players()
+                closest_opp_dist = min([lugo4py.geo.distance_between_points(point, opp.position) for opp in opponents]) if opponents else float('inf')
+
+                dist_to_goal = lugo4py.geo.distance_between_points(point, opponent_goal)
+                
+                score = closest_opp_dist - dist_to_goal * 0.5
+
+                if score > best_score:
+                    best_score = score
+                    best_pos = point
+        
+        return best_pos if best_pos else get_my_expected_position(inspector, self.mapper, self.number)

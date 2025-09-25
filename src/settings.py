@@ -50,17 +50,17 @@ def get_my_expected_position(inspector: lugo4py.GameSnapshotInspector, my_mapper
             10: {'Col': 7, 'Row': 4},
             11: {'Col': 7, 'Row': 1},
         },
-        'OFFENSIVE': {
-            2: {'Col': 3, 'Row': 1},
-            3: {'Col': 5, 'Row': 2},
-            4: {'Col': 5, 'Row': 3},
-            5: {'Col': 3, 'Row': 4},
-            6: {'Col': 7, 'Row': 1},
-            7: {'Col': 8, 'Row': 2},
-            8: {'Col': 8, 'Row': 3},
-            9: {'Col': 7, 'Row': 4},
-            10: {'Col': 9, 'Row': 4},
-            11: {'Col': 9, 'Row': 1},
+        'OFFENSIVE': { # tatica de ofensiva mudada
+            2: {'Col': 4, 'Row': 1},   
+            3: {'Col': 6, 'Row': 2},  
+            4: {'Col': 6, 'Row': 3},   
+            5: {'Col': 4, 'Row': 4},   
+            6: {'Col': 7, 'Row': 0},   
+            7: {'Col': 8, 'Row': 2},   
+            8: {'Col': 8, 'Row': 3},   
+            9: {'Col': 7, 'Row': 5},  
+            10: {'Col': 9, 'Row': 3},  
+            11: {'Col': 9, 'Row': 2}, 
         }
     }
 
